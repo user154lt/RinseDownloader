@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">RinseDownloader</string>
+    <string name="app_title">Rinse Downloader</string>
     <string name="select_dates_label">Select dates</string>
     <string name="confirm_button_label">Confirm</string>
     <string name="dismiss_button_label">Dismiss</string>

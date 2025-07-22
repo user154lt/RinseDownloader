@@ -85,7 +85,7 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(text = stringResource(R.string.app_name))
+                    Text(text = stringResource(R.string.app_title))
                 }
             )
         },
