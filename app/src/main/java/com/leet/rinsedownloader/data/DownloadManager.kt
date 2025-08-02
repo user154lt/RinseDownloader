@@ -24,29 +24,7 @@ class DownloadManager(
 
     private val isSDKQOrAbove = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
-    suspend fun downloadFile(url: String, updateProgress: suspend (Float) -> Unit) {
-        val fileUri = insertFileEntry(url.split("/").last())
-        fileUri?.let {
-            val stream = contentResolver.openOutputStream(it)?.asSink()
-            coroutineScope {
-                client.prepareGet(url).execute { response ->
-                    var count = 0L
-                    val channel: ByteReadChannel = response.body()
-                    stream?.use { fileStream ->
-                        while (!channel.exhausted()) {
-                            val chunk = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
-                            count += chunk.remaining
-                            updateDownloadProgress(count, response.contentLength(), updateProgress)
-                            chunk.transferTo(fileStream)
-                        }
-                    }
-                }
-            }
-            if (isSDKQOrAbove) clearPending(it)
-        }
-    }
-
-    private fun insertFileEntry(fileName: String): Uri? {
+    fun insertFileEntry(fileName: String): Uri? {
         val contentValues = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
             put(MediaStore.Downloads.MIME_TYPE, "audio/mpeg")
@@ -55,20 +33,48 @@ class DownloadManager(
         return contentResolver.insert(downloadCollectionUri, contentValues)
     }
 
+    suspend fun downloadFile(
+        url: String,
+        localFileUri: Uri,
+        updateProgress: suspend (Float) -> Unit
+    ) {
+        val stream = contentResolver.openOutputStream(localFileUri)?.asSink()
+        coroutineScope {
+            client.prepareGet(url).execute { response ->
+                var count = 0L
+                val channel: ByteReadChannel = response.body()
+                stream?.use { fileStream ->
+                    while (!channel.exhausted()) {
+                        val chunk = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
+                        count += chunk.remaining
+                        updateDownloadProgress(count, response.contentLength(), updateProgress)
+                        chunk.transferTo(fileStream)
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun updateDownloadProgress(
         count: Long,
         size: Long?,
         updateProgress: suspend (Float) -> Unit
-    ){
-        val progress = if(size != null) count / size.toFloat() else -1f
+    ) {
+        val progress = if (size != null) count / size.toFloat() else -1f
         updateProgress(progress)
     }
 
-    private fun clearPending(fileUri: Uri) {
-        val clearPending = ContentValues().apply {
-            put(MediaStore.Downloads.IS_PENDING, 0)
+    fun clearPending(fileUri: Uri) {
+        if (isSDKQOrAbove) {
+            val clearPending = ContentValues().apply {
+                put(MediaStore.Downloads.IS_PENDING, 0)
+            }
+            contentResolver.update(fileUri, clearPending, null, null)
         }
-        contentResolver.update(fileUri, clearPending, null, null)
+    }
+
+    fun deleteFile(fileUri: Uri){
+        contentResolver.delete(fileUri, null, null)
     }
 
 }

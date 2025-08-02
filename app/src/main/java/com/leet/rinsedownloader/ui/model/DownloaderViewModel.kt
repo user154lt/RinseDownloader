@@ -93,7 +93,7 @@ class DownloaderViewModel(
         }
     }
 
-    private suspend fun cancelAllJobs(){
+    private suspend fun cancelAllJobs() {
         scheduleJob?.cancelAndJoin()
         episodeJobMap.entries.forEach { it.value.cancelAndJoin() }
         episodeJobMap.clear()
@@ -113,14 +113,15 @@ class DownloaderViewModel(
         }
     }
 
-    private suspend fun updateSingleSchedule(episodes: List<Episode>) = withContext(Dispatchers.Main) {
-        _uiState.update {
-            it.copy(
-                scheduleData = ScheduleData(episodes),
-                isLoadingSchedules = false,
-            )
+    private suspend fun updateSingleSchedule(episodes: List<Episode>) =
+        withContext(Dispatchers.Main) {
+            _uiState.update {
+                it.copy(
+                    scheduleData = ScheduleData(episodes),
+                    isLoadingSchedules = false,
+                )
+            }
         }
-    }
 
     private suspend fun loadSchedulesFor(range: Pair<Long, Long>) = withContext(Dispatchers.IO) {
         val accumulatedEpisodes = mutableListOf<Episode>()
@@ -154,18 +155,19 @@ class DownloaderViewModel(
             }
     }
 
-    private suspend fun updateErrorMessage(failedTimestamps: List<Long>) = withContext(Dispatchers.Main) {
-        val message = if(failedTimestamps.size == 1){
-            "Failed to get schedule for ${failedTimestamps.first().toLocalDate()}"
-        } else {
-            "Failed to get ${failedTimestamps.size} schedules"
+    private suspend fun updateErrorMessage(failedTimestamps: List<Long>) =
+        withContext(Dispatchers.Main) {
+            val message = if (failedTimestamps.size == 1) {
+                "Failed to get schedule for ${failedTimestamps.first().toLocalDate()}"
+            } else {
+                "Failed to get ${failedTimestamps.size} schedules"
+            }
+            _uiState.update {
+                it.copy(
+                    snackbarMessage = message
+                )
+            }
         }
-        _uiState.update {
-            it.copy(
-                snackbarMessage = message
-            )
-        }
-    }
 
     private suspend fun updateIsLoading(isLoading: Boolean) = withContext(Dispatchers.Main) {
         _uiState.update {
@@ -174,8 +176,6 @@ class DownloaderViewModel(
             )
         }
     }
-
-
 
 
     fun filterChannels(channel: RinseChannel) = viewModelScope.launch {
@@ -190,17 +190,23 @@ class DownloaderViewModel(
         if (episode.downloadState is DownloadState.InProgress) return@launch
         updateDownloadState(episode, DownloadState.InProgress(0f))
         val job = launch(Dispatchers.IO) {
-            try {
-                downloadManager.downloadFile(episode.fileUrl) {
-                    withContext(Dispatchers.Main) {
-                        updateDownloadProgress(episode, it)
+            val localFileUri = downloadManager.insertFileEntry(episode.fileUrl.split("/").last())
+            localFileUri?.let { uri ->
+                try {
+                    downloadManager.downloadFile(episode.fileUrl, uri) {
+                        withContext(Dispatchers.Main) {
+                            updateDownloadProgress(episode, it)
+                        }
                     }
-                }
-            } catch (e: Throwable) {
-                if (e is CancellationException) {
-                    throw e
-                } else {
-                    onDownloadFailed(episode)
+                    downloadManager.clearPending(uri)
+                } catch (e: Throwable) {
+                    downloadManager.clearPending(uri)
+                    downloadManager.deleteFile(uri)
+                    if (e is CancellationException) {
+                        throw e
+                    } else {
+                        onDownloadFailed(episode)
+                    }
                 }
             }
         }
