@@ -9,6 +9,7 @@ import com.leet.rinsedownloader.data.ScheduleManager
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.UserAgent
 
 
 class MainApplication : Application() {
@@ -17,6 +18,9 @@ class MainApplication : Application() {
     lateinit var downloadManager: DownloadManager
 
     private val client = HttpClient(OkHttp){
+        install(UserAgent){
+            agent = "User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+        }
         install(HttpRequestRetry){
             retryOnServerErrors(5)
             exponentialDelay()
